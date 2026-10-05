@@ -10,6 +10,8 @@
 
 <br />
 
+<img width="1509" height="848" alt="Ekran görüntüsü 2026-10-06 015652" src="https://github.com/user-attachments/assets/d6c97ec6-8725-4100-9258-2ec3a3ac5508" />
+
 ## 📖 About The Project
 
 O.R.T.A.K. is a custom-built, highly integrated desktop utility and AI assistant. It was designed to manage intense study sessions and minimize distractions in busy environments like dormitories. It acts as a digital thought partner for computer science coursework—whether you are tackling C programming practice or solving differential equations.
