@@ -10,7 +10,7 @@
 
 <br />
 
-<img width="1509" height="848" alt="Ekran görüntüsü 2026-10-06 015652" src="https://github.com/user-attachments/assets/d6c97ec6-8725-4100-9258-2ec3a3ac5508" />
+<img width="1501" height="848" alt="Ekran görüntüsü 2026-10-06 022909" src="https://github.com/user-attachments/assets/67158c0a-c1d1-444d-8e77-6bf0842ad2cc" />
 
 ## 📖 About The Project
 
