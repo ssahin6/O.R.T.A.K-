@@ -35,12 +35,14 @@ namespace ortak2
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
                     LaunchApplication("steam://open/main", "Steam başlatılıyor, efendim.") :
                     KillProcess("steam", "steamwebhelper");
+
             // Müzik Modu Kontrolü
             if (inputLower.Contains("open music mode") || inputLower.Contains("müzik modunu aç"))
                 return GetMusicMode();
 
             if (inputLower.Contains("epic games"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch") || inputLower.Contains("start")) ?
+                    // NOT: Aşağıdaki dosya yolunu kendi bilgisayarınızdaki EpicGamesLauncher.exe konumuyla değiştirin.
                     LaunchApplication(@"D:\epic\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe", "Epic Games açılıyor.") :
                     KillProcess("EpicGamesLauncher");
 
@@ -78,6 +80,7 @@ namespace ortak2
 
             if (inputLower.Contains("fifa") || inputLower.Contains("fc 26"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
+                    // NOT: Aşağıdaki dosya yolunu kendi bilgisayarınızdaki FC26.exe konumuyla değiştirin.
                     LaunchApplication(@"D:\epic\game\EA SPORTS FC 26\FC26.exe", "Launching EA SPORTS FC 26.") :
                     KillProcess("FC26");
 
@@ -106,8 +109,8 @@ namespace ortak2
             if (inputLower.Contains("work") && inputLower.Contains("mode"))
                 return GetWorkMode();
 
-            // --- 4. YAPAY ZEKAYA GÖNDER (Ollama) ---
-            return await AskAI(input);
+            // --- 4. BİLGİ SORULARI İÇİN GOOGLE ARAMASI ---
+            return await Task.FromResult(SearchGoogle(input));
         }
 
         // --- YETENEKLER (SKILLS) ---
@@ -228,6 +231,24 @@ namespace ortak2
                 }
             }
             return "Spotify window not found in the background.";
+        }
+        private string SearchGoogle(string query)
+        {
+            try
+            {
+                // Soruyu internet linki formatına çevir (boşlukları düzenler)
+                string urlFormatliSoru = Uri.EscapeDataString(query);
+                string url = $"https://www.google.com/search?q={urlFormatliSoru}";
+
+                // Tarayıcıda arama sonucunu aç
+                LaunchApplication(url);
+
+                return $"Bu sorunun cevabını doğrudan bilmiyorum, ancak sizin için web'de bu sonuçları buldum efendim.";
+            }
+            catch
+            {
+                return "İnternet araması başlatılamadı efendim.";
+            }
         }
 
         // --- YAPAY ZEKA BAĞLANTISI ---
