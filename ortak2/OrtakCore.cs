@@ -6,6 +6,12 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Calendar.v3;
+using Google.Apis.Calendar.v3.Data;
+using Google.Apis.Services;
+using Google.Apis.Util.Store;
+using System.Threading;
 
 namespace ortak2
 {
@@ -24,46 +30,46 @@ namespace ortak2
         {
             string inputLower = input.ToLower();
 
-            // --- 1. UYGULAMA VE SİTE KONTROLLERİ ---
+            // --- 1. APPLICATION AND SITE CONTROLS ---
 
             if (inputLower.Contains("google"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
-                    OpenWebPage("https://www.google.com", "Google ana sayfası açılıyor, efendim.") :
+                    OpenWebPage("https://www.google.com", "Opening Google homepage, sir.") :
                     KillProcess("chrome", "msedge", "opera");
 
             if (inputLower.Contains("steam"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
-                    LaunchApplication("steam://open/main", "Steam başlatılıyor, efendim.") :
+                    LaunchApplication("steam://open/main", "Starting Steam, sir.") :
                     KillProcess("steam", "steamwebhelper");
 
-            // Müzik Modu Kontrolü
+            // Music Mode Control
             if (inputLower.Contains("open music mode") || inputLower.Contains("müzik modunu aç"))
                 return GetMusicMode();
 
             if (inputLower.Contains("epic games"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch") || inputLower.Contains("start")) ?
                     // NOT: Aşağıdaki dosya yolunu kendi bilgisayarınızdaki EpicGamesLauncher.exe konumuyla değiştirin.
-                    LaunchApplication(@"D:\epic\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe", "Epic Games açılıyor.") :
+                    LaunchApplication(@"D:\epic\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe", "Launching Epic Games.") :
                     KillProcess("EpicGamesLauncher");
 
             if (inputLower.Contains("opera"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
-                    LaunchApplication("opera.exe", "Opera tarayıcı başlatılıyor.") :
+                    LaunchApplication("opera.exe", "Opera browser is launching.") :
                     KillProcess("opera", "opera_crashreporter");
 
             if (inputLower.Contains("visual studio"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
-                    LaunchApplication("devenv.exe", "Visual Studio başlatılıyor. İyi çalışmalar efendim.") :
+                    LaunchApplication("devenv.exe", "Starting Visual Studio. Have a productive session, sir.") :
                     KillProcess("devenv");
 
             if (inputLower.Contains("task manager") || inputLower.Contains("görev yöneticisi"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
-                    LaunchApplication("taskmgr.exe", "Görev Yöneticisi ekrana yansıtılıyor.") :
+                    LaunchApplication("taskmgr.exe", "Projecting Task Manager to your screen.") :
                     KillProcess("taskmgr");
 
             if (inputLower.Contains("control panel") || inputLower.Contains("denetim masası"))
                 return (inputLower.Contains("open") || inputLower.Contains("launch")) ?
-                    LaunchApplication("control.exe", "Denetim Masası açılıyor.") :
+                    LaunchApplication("control.exe", "Opening Control Panel.") :
                     KillProcess("explorer");
 
             if (inputLower.Contains("instagram"))
@@ -89,14 +95,14 @@ namespace ortak2
                     OpenWebPage("https://youtube.com") :
                     KillProcess("chrome", "msedge", "opera");
 
-            // --- 2. SPOTIFY MANUEL SES KONTROLÜ ---
+            // --- 2. SPOTIFY MANUAL AUDIO CONTROLS ---
             if (inputLower.Contains("pause music") || inputLower.Contains("müziği durdur"))
                 return ControlSpotify(true);
 
             if (inputLower.Contains("resume music") || inputLower.Contains("müziği aç"))
                 return ControlSpotify(false);
 
-            // --- 3. SİSTEM RAPORLARI VE MODLAR ---
+            // --- 3. SYSTEM REPORTS AND MODES ---
             if (inputLower.Contains("system report") || inputLower.Contains("hardware"))
                 return GetSystemReport();
 
@@ -109,11 +115,11 @@ namespace ortak2
             if (inputLower.Contains("work") && inputLower.Contains("mode"))
                 return GetWorkMode();
 
-            // --- 4. BİLGİ SORULARI İÇİN GOOGLE ARAMASI ---
+            // --- 4. GOOGLE SEARCH FOR INFORMATION QUESTIONS ---
             return await Task.FromResult(SearchGoogle(input));
         }
 
-        // --- YETENEKLER (SKILLS) ---
+        // --- SKILLS ---
 
         private string LaunchApplication(string pathOrUri, string successMessage = "Launching requested application, sir.")
         {
@@ -140,7 +146,7 @@ namespace ortak2
                 var processes = Process.GetProcessesByName(name);
                 foreach (var proc in processes)
                 {
-                    try { proc.Kill(); killed = true; } catch { /* Yetki hatası yoksayılabilir */ }
+                    try { proc.Kill(); killed = true; } catch { /* Ignore permission errors */ }
                 }
             }
             return killed ? "Processes terminated successfully." : "No active processes found to terminate.";
@@ -153,21 +159,21 @@ namespace ortak2
 
         private string GetCodingMode()
         {
-            // Dikkat dağıtıcıları kapat, çalışma araçlarını aç
+            // Close distractions, open work tools
             KillProcess("FC26", "EpicGamesLauncher", "steam", "chrome", "msedge", "opera", "Discord");
             LaunchApplication("spotify:");
             LaunchApplication("devenv.exe");
-            return "Kodlama düzeni aktif. Tüm dikkat dağıtıcılar kapatıldı, Visual Studio ve Spotify başlatıldı. İyi çalışmalar efendim.";
+            return "Coding mode activated. All distractions are closed, Visual Studio and Spotify have been launched. Enjoy your session, sir.";
         }
         private string GetMusicMode()
         {
-            // Ekranda açık olabilecek genel uygulamaları (tarayıcılar, oyunlar, editörler) kapat
+            // Close general apps (browsers, games, editors)
             KillProcess("FC26", "EpicGamesLauncher", "steam", "chrome", "msedge", "opera", "Discord", "devenv", "taskmgr", "control");
 
-            // Spotify'ı başlat
+            // Launch Spotify
             LaunchApplication("spotify:");
 
-            return "Müzik modu devrede. Ekran temizlendi ve Spotify başlatıldı. Keyifli dinlemeler efendim.";
+            return "Music mode engaged. Display cleared and Spotify launched. Enjoy the music, sir.";
         }
 
         private string GetWorkMode()
@@ -207,7 +213,7 @@ namespace ortak2
             return $"Good morning, sir. Today is {date}. 'Ve sen kuş olup gidersin, ben sana bakakalırdım...' I hope you stick to your daily plans. All systems are operational.";
         }
 
-        // --- SPOTIFY MANUEL ÇEKİRDEK KONTROLÜ (WINDOWS API) ---
+        // --- SPOTIFY MANUAL CORE CONTROL (WINDOWS API) ---
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
@@ -232,26 +238,25 @@ namespace ortak2
             }
             return "Spotify window not found in the background.";
         }
+
         private string SearchGoogle(string query)
         {
             try
             {
-                // Soruyu internet linki formatına çevir (boşlukları düzenler)
                 string urlFormatliSoru = Uri.EscapeDataString(query);
                 string url = $"https://www.google.com/search?q={urlFormatliSoru}";
 
-                // Tarayıcıda arama sonucunu aç
                 LaunchApplication(url);
 
-                return $"Bu sorunun cevabını doğrudan bilmiyorum, ancak sizin için web'de bu sonuçları buldum efendim.";
+                return $"I don't have a direct answer for this, but I have found these results on the web for you, sir.";
             }
             catch
             {
-                return "İnternet araması başlatılamadı efendim.";
+                return "Unable to initiate internet search, sir.";
             }
         }
 
-        // --- YAPAY ZEKA BAĞLANTISI ---
+        // --- AI CONNECTION ---
         private async Task<string> AskAI(string input)
         {
             try

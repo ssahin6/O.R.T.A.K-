@@ -14,6 +14,10 @@ using System.Windows.Media;
 using MailKit;
 using System.Runtime.InteropServices;
 using NAudio.CoreAudioApi;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 
 namespace ortak2
 {
@@ -67,6 +71,7 @@ namespace ortak2
             _audioMonitorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _audioMonitorTimer.Tick += AudioMonitorTimer_Tick;
             _audioMonitorTimer.Start();
+            TakvimiArayuzeYukle();
         }
 
         private void SensorleriBaslat()
@@ -172,6 +177,32 @@ namespace ortak2
         {
             if (e.Key == Key.Enter)
             {
+                string yazilanKomut = txtGirdi.Text.ToLower();
+
+                // 1. TAKVİM EKLEME KONTROLÜ
+                if (yazilanKomut.Contains("dersim var") || yazilanKomut.Contains("toplantım var") || yazilanKomut.Contains("planla"))
+                {
+                    await TakvimPlanlaAsync(yazilanKomut);
+                    txtGirdi.Clear();
+                    return;
+                }
+
+                // 2. TAKVİMİ OKUMA (GÖSTERME) KONTROLÜ
+                if (yazilanKomut.Contains("planlarımı göster") || yazilanKomut.Contains("haftalık plan") || yazilanKomut.Contains("neler var"))
+                {
+                    _ortakSesi.SpeakAsync("Checking your calendar right away, sir.");
+
+                    GoogleTakvimEntegrasyonu takvim = new GoogleTakvimEntegrasyonu();
+                    string haftalikPlan = await takvim.HaftalikPlaniGetirAsync();
+
+                    txtCikti.Text += $"\n{haftalikPlan}\n";
+
+                    _ortakSesi.SpeakAsync("I have displayed your schedule for the next seven days on the screen, sir.");
+
+                    txtGirdi.Clear();
+                    return;
+                }
+
                 await IstekIsle();
             }
         }
@@ -209,7 +240,7 @@ namespace ortak2
                     using (var client = new ImapClient())
                     {
                         client.Connect("imap.gmail.com", 993, MailKit.Security.SecureSocketOptions.SslOnConnect);
-                        client.Authenticate("YOUR_EMAIL_HERE", "YOUR_APP_PASSWORD_HERE");
+                        client.Authenticate("ssahin.2152@gmail.com", "mkqu vyap twxm ruip");
 
                         client.Inbox.Open(FolderAccess.ReadOnly);
                         var okunmamislar = client.Inbox.Search(SearchQuery.NotSeen);
@@ -293,15 +324,17 @@ namespace ortak2
 
         private async void Ortak_SesDuydu(object sender, SpeechRecognizedEventArgs e)
         {
-            if (e.Result.Confidence > 0.01f)
+            if (e.Result.Confidence > 0.50f)
             {
                 string algilananKomut = e.Result.Text.ToLower();
                 txtGirdi.Text = algilananKomut;
 
+                txtCikti.Text += $"\n[TEST] {algilananKomut} - Score: {e.Result.Confidence}\n";
+
                 if (algilananKomut == "ortak")
                 {
-                    txtCikti.Text += $"\n[SEN]: {algilananKomut}\n";
-                    _ortakSesi.SpeakAsync("Sistemler devrede. Sizi dinliyorum.");
+                    txtCikti.Text += $"\n[YOU]: {algilananKomut}\n";
+                    _ortakSesi.SpeakAsync("Systems are online. I am listening, sir.");
                     txtGirdi.Clear();
                 }
             }
@@ -311,6 +344,91 @@ namespace ortak2
             if (e.Result.Confidence > 0.5f && e.Result.Text.ToLower() != "ortak")
             {
                 await IstekIsle();
+            }
+        }
+
+        private async Task<string> ArkaPlandaOllamayaSor(string prompt)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                client.Timeout = TimeSpan.FromMinutes(5);
+
+                string url = "http://localhost:11434/api/generate";
+
+                var istekGövdesi = new
+                {
+                    model = "qwen2.5:14b",
+                    prompt = prompt,
+                    stream = false
+                };
+
+                string json = JsonSerializer.Serialize(istekGövdesi);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                HttpResponseMessage response = await client.PostAsync(url, content);
+                response.EnsureSuccessStatusCode();
+
+                string jsonCevap = await response.Content.ReadAsStringAsync();
+
+                using (JsonDocument doc = JsonDocument.Parse(jsonCevap))
+                {
+                    return doc.RootElement.GetProperty("response").GetString();
+                }
+            }
+        }
+
+        private async Task TakvimPlanlaAsync(string algilananCumle)
+        {
+            _ortakSesi.SpeakAsync("Adding it to your calendar immediately. Please wait, sir.");
+
+            try
+            {
+                string gunSozlugu = $"bugün: {DateTime.Now.ToString("yyyy-MM-dd")}\n";
+                gunSozlugu += $"yarın: {DateTime.Now.AddDays(1).ToString("yyyy-MM-dd")}\n";
+                for (int i = 0; i <= 7; i++)
+                {
+                    gunSozlugu += $"{DateTime.Now.AddDays(i).ToString("dddd").ToLower()}: {DateTime.Now.AddDays(i).ToString("yyyy-MM-dd")}\n";
+                }
+
+                string prompt = $@"Kullanıcı metni: '{algilananCumle}'
+
+Sen bir tarih çözümleyicisin. Kullanıcının bahsettiği günün tarihini KESİNLİKLE aşağıdaki sözlükten EŞLEŞTİREREK bul. Asla kendi kendine tarih hesaplama veya uydurma:
+{gunSozlugu}
+
+Lütfen metinden etkinliğin adını ve saatini bul (Saat belirtilmemişse 09:00 yap). 
+SADECE şu formatta yanıt ver, başka hiçbir kelime ekleme:
+ETKİNLİK: [Etkinlik Adı]
+TARİH: [Sözlükten Bulduğun Tarih HH:mm]";
+
+                string ollamaYaniti = await ArkaPlandaOllamayaSor(prompt);
+                ollamaYaniti = ollamaYaniti.Trim();
+
+                txtCikti.Text += $"\n[OLLAMA CALENDAR PARSE]:\n{ollamaYaniti}\n";
+
+                string[] satirlar = ollamaYaniti.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (satirlar.Length >= 2)
+                {
+                    string etkinlikAdi = satirlar[0].Replace("ETKİNLİK:", "").Trim();
+                    string tarihMetni = satirlar[1].Replace("TARİH:", "").Trim();
+
+                    DateTime planlananTarih = DateTime.Parse(tarihMetni);
+
+                    GoogleTakvimEntegrasyonu takvim = new GoogleTakvimEntegrasyonu();
+                    await takvim.EtkinlikEkleAsync(etkinlikAdi, planlananTarih);
+
+                    _ortakSesi.SpeakAsync($"The event '{etkinlikAdi}' has been successfully added to your calendar, sir.");
+                    txtCikti.Text += $"\n[SYSTEM]: Successfully added to calendar!\n";
+                }
+                else
+                {
+                    _ortakSesi.SpeakAsync("I couldn't extract a valid date from your sentence. Please specify the time and day more clearly, sir.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _ortakSesi.SpeakAsync("An error occurred while accessing the calendar. Please check your connection, sir.");
+                txtCikti.Text += $"\n[ERROR]: {ex.Message}\n";
             }
         }
 
@@ -354,7 +472,9 @@ namespace ortak2
                                 var proc = Process.GetProcessById((int)session.GetProcessID);
                                 string pName = proc.ProcessName.ToLower();
 
-                                if (pName == "chrome" || pName == "opera" || pName == "msedge")
+                                List<string> yokSayilacakUygulamalar = new List<string> { "spotify", "ortak2", "fc26", "audiodg", "Spotify" };
+
+                                if (!yokSayilacakUygulamalar.Contains(pName))
                                 {
                                     if (session.AudioMeterInformation.MasterPeakValue > 0.01f)
                                     {
@@ -368,27 +488,23 @@ namespace ortak2
                     }
                 }
 
-                // --- GÜNCELLENEN KARAR MEKANİZMASI (SESSİZLİK TOLERANSI) ---
                 if (tarayicidanSesGeliyorMu)
                 {
-                    _sessizlikSayaci = 0; // Ses duyulduğu an sayacı sıfırla
+                    _sessizlikSayaci = 0;
 
                     if (!_bizDurdurduk)
                     {
-                        SpotifyMedyaKontrol(true); // Spotify'ı durdur
+                        SpotifyMedyaKontrol(true);
                         _bizDurdurduk = true;
                     }
                 }
                 else
                 {
-                    // Ses kesildiyse ve Spotify'ı biz durdurduysak bekleme sürecini başlat
                     if (_bizDurdurduk)
                     {
                         _sessizlikSayaci++;
 
-                        // Zamanlayıcımız 500ms (0.5 saniye) olduğu için 6 döngü = 3 saniye eder.
-                        // 3 Saniye boyunca kesintisiz sessizlik olursa müziği başlatır.
-                        if (_sessizlikSayaci >= 6)
+                        if (_sessizlikSayaci >= 3)
                         {
                             SpotifyMedyaKontrol(false);
                             _bizDurdurduk = false;
@@ -414,6 +530,23 @@ namespace ortak2
                     SendMessage(proc.MainWindowHandle, WM_APPCOMMAND, proc.MainWindowHandle, (IntPtr)command);
                     break;
                 }
+            }
+        }
+
+        private async void TakvimiArayuzeYukle()
+        {
+            try
+            {
+                txtTakvimArayuzu.Text = "Fetching calendar data...";
+
+                GoogleTakvimEntegrasyonu takvim = new GoogleTakvimEntegrasyonu();
+                string planlar = await takvim.HaftalikPlaniGetirAsync();
+
+                txtTakvimArayuzu.Text = planlar;
+            }
+            catch (Exception)
+            {
+                txtTakvimArayuzu.Text = "Calendar connection error.";
             }
         }
     }

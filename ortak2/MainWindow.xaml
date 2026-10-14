@@ -189,5 +189,12 @@
                 </StackPanel>
             </Border>
         </StackPanel>
+
+        <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,60,40" Width="280">
+            <TextBlock Text="UPCOMING EVENTS" Foreground="#FFA500" FontWeight="Bold" FontSize="12" FontFamily="Consolas" Margin="0,0,0,8"/>
+            <ScrollViewer Height="130" VerticalScrollBarVisibility="Hidden">
+                <TextBlock x:Name="txtTakvimArayuzu" Foreground="White" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" />
+            </ScrollViewer>
+        </StackPanel>
     </Grid>
 </Window>
